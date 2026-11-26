@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>音に色をつけてみよう</title>
+<style>
+:root{
+  --bg:#F7F9FB; --surface:#FFFFFF; --ink:#18324A; --sub:#566B7D; --line:#D5DEE6; --teal:#0E6E8A; --teal-ink:#FFFFFF; --accent:#B0157E;
+  color-scheme: light; box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0F1A24; --surface:#16242F; --ink:#E6EEF4; --sub:#9DB0BF; --line:#2B3D4B; --teal:#3FA9C6; --teal-ink:#06212B; --accent:#F06BC6; color-scheme: dark; } }
+:root[data-theme="dark"]{ --bg:#0F1A24; --surface:#16242F; --ink:#E6EEF4; --sub:#9DB0BF; --line:#2B3D4B; --teal:#3FA9C6; --teal-ink:#06212B; --accent:#F06BC6; color-scheme: dark; }
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI","Meiryo",sans-serif;font-size:17px;line-height:1.75;-webkit-text-size-adjust:100%}
+main{max-width:560px;margin:0 auto;padding:22px 16px 40px}
+h1{font-size:1.65rem;line-height:1.35;margin:.2em 0 .5em}
+h2{font-size:1.2rem;margin:0 0 .4em}
+p{margin:.4em 0}
+.lead,.hint,.small{color:var(--sub)} .hint{font-size:.92rem} .small{font-size:.88rem}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;margin:16px 0}
+.btn{display:block;width:100%;font:inherit;font-weight:700;border:0;border-radius:12px;padding:14px 16px;margin:10px 0 0;cursor:pointer;background:var(--teal);color:var(--teal-ink)}
+.btn.ghost{background:transparent;color:var(--teal);border:2px solid var(--teal)}
+.btn:disabled{opacity:.38;cursor:default}
+.progress{height:6px;border-radius:3px;background:var(--line);margin:4px 0 14px;overflow:hidden}
+.progress span{display:block;height:100%;background:var(--teal)}
+.qtitle{font-size:1.6rem;font-weight:800;margin:0}
+.palette{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;margin-top:12px}
+.palette button{aspect-ratio:1/1;border:1px solid var(--line);border-radius:6px;cursor:pointer;padding:0;min-width:0}
+.palette button:disabled{opacity:.35;cursor:default}
+.palette button:focus-visible,.btn:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.none{margin-top:10px}
+.row{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.nm{width:3.2em;font-weight:800}
+.sw{width:34px;height:34px;border-radius:8px;border:1px solid var(--line)}
+.sw.na{background:repeating-linear-gradient(45deg,var(--line) 0 4px,transparent 4px 8px)}
+.sc{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--sub);font-size:.95rem}
+.score{font-size:2.6rem;font-weight:800;line-height:1.1;margin:.1em 0}
+svg{display:block;width:100%;height:auto}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script>
+"use strict";
+// ドレミファソラシ（C4〜B4）を 1つずつ 鳴らし 感じた色を 選ぶ。各音 3回（計21回 ランダムな順）。
+// ばらつきの点数：同じ音に選んだ 3つの色の 2つずつの組の RGB（0〜1）の 差の絶対値の合計（3組）の 平均（Eagleman ら 2007 の考え方にならった 簡易版）。
+const NOTES = [{n:"ド",m:60},{n:"レ",m:62},{n:"ミ",m:64},{n:"ファ",m:65},{n:"ソ",m:67},{n:"ラ",m:69},{n:"シ",m:71}];
+const REPS = 3;
+let ctx=null, master=null, playing=false, trials=[], idx=0;
+const picks = NOTES.map(()=>[]);   // 各音の 選んだ色（[r,g,b] 0〜1 または null）
+const app = document.getElementById("app");
+
+function audio(){
+  if(!ctx){ try{ if(navigator.audioSession) navigator.audioSession.type="playback"; }catch(e){}
+    ctx=new (window.AudioContext||window.webkitAudioContext)(); master=ctx.createGain(); master.gain.value=0.32; master.connect(ctx.destination); }
+  if(ctx.state==="suspended") ctx.resume(); return ctx;
+}
+function tone(m,dur,onEnd){
+  audio(); playing=true;
+  const t0=ctx.currentTime+0.05, f=440*Math.pow(2,(m-69)/12), g=ctx.createGain();
+  g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime(1,t0+0.01); g.gain.setTargetAtTime(0.0001,t0+0.01,1/2.5);
+  g.gain.setTargetAtTime(0.0001,t0+dur-0.05,0.01); g.connect(master);
+  for(let k=1;k<=6;k++){ const o=ctx.createOscillator(), a=ctx.createGain(); o.frequency.value=f*k; a.gain.value=0.6/k/2.45; o.connect(a); a.connect(g); o.start(t0); o.stop(t0+dur+0.02); }
+  setTimeout(()=>{playing=false; onEnd&&onEnd();},(dur+0.1)*1000);
+}
+// 色の パレット：12の色相 × 5段の明るさ ＋ 白から黒の 灰色
+function hsl2rgb(h,s,l){ s/=100; l/=100; const k=n=>(n+h/30)%12, a=s*Math.min(l,1-l), f=n=>l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1))); return [f(0),f(8),f(4)]; }
+const PALETTE=[];
+[85,70,55,40,25].forEach(l=>{ for(let i=0;i<12;i++) PALETTE.push(hsl2rgb(i*30,85,l)); });
+for(let i=0;i<12;i++){ const v=1-i/11; PALETTE.push([v,v,v]); }
+const css=c=>`rgb(${Math.round(c[0]*255)},${Math.round(c[1]*255)},${Math.round(c[2]*255)})`;
+const lum=c=>0.2126*c[0]+0.7152*c[1]+0.0722*c[2];
+
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+function intro(){
+  app.innerHTML=`
+  <h1>音に 色を つけてみよう</h1>
+  <p class="lead">音を 1つずつ 聞いて 感じた色を 選びます（全部で 21回 約3分）。</p>
+  <div class="panel"><h2>はじめる前に</h2>
+    <ul><li>イヤホンを使ってください</li><li>iPhone は 消音モード（マナーモード）を 解除してください</li><li>深く考えず 最初に 浮かんだ色を 選んでください</li><li>色を感じなければ「色を 感じない」を 選んでください</li></ul>
+    <button class="btn ghost" id="test">音量を 確かめる</button></div>
+  <button class="btn" id="start">はじめる</button>
+  <p class="small">知覚・認知心理学特殊Ⅰ 第8回 共感覚の体験。回答は この端末の外に 送られません。</p>`;
+  document.getElementById("test").onclick=e=>{ if(!playing){ e.target.disabled=true; tone(67,1.2,()=>e.target.disabled=false); } };
+  document.getElementById("start").onclick=()=>{ trials=shuffle(NOTES.flatMap((_,i)=>Array(REPS).fill(i))); idx=0; picks.forEach(p=>p.length=0); trial(); };
+}
+
+function trial(){
+  const ni=trials[idx];
+  app.innerHTML=`
+  <div class="progress"><span style="width:${idx/trials.length*100}%"></span></div>
+  <p class="hint">${idx+1} / ${trials.length}</p>
+  <p class="qtitle">この音は 何色？</p>
+  <div class="panel">
+    <button class="btn" id="play">もう一度 聞く</button>
+    <div class="palette" id="pal">${PALETTE.map((c,i)=>`<button data-i="${i}" style="background:${css(c)}" aria-label="色 ${i+1}" disabled></button>`).join("")}</div>
+    <button class="btn ghost none" id="none" disabled>色を 感じない</button>
+  </div>`;
+  const btns=[...app.querySelectorAll("#pal button"), document.getElementById("none")];
+  const enable=()=>btns.forEach(b=>b.disabled=false);
+  const pb=document.getElementById("play");
+  const playIt=()=>{ if(playing) return; pb.disabled=true; tone(NOTES[ni].m,1.2,()=>{ pb.disabled=false; enable(); }); };
+  pb.onclick=playIt; playIt();
+  const choose=c=>{ picks[ni].push(c); idx++; if(idx<trials.length) trial(); else results(); };
+  app.querySelectorAll("#pal button").forEach(b=>b.onclick=()=>choose(PALETTE[+b.dataset.i]));
+  document.getElementById("none").onclick=()=>choose(null);
+}
+
+function spread(cs){   // 3つの色の 2つずつの組の 差の合計（色なしを含む音は 計算しない）
+  if(cs.some(c=>c===null)) return null;
+  let s=0; for(let i=0;i<cs.length;i++) for(let j=i+1;j<cs.length;j++) s+=Math.abs(cs[i][0]-cs[j][0])+Math.abs(cs[i][1]-cs[j][1])+Math.abs(cs[i][2]-cs[j][2]);
+  return s;
+}
+
+function results(){
+  const sc=picks.map(spread), valid=sc.filter(v=>v!==null);
+  const mean=valid.length? valid.reduce((a,b)=>a+b,0)/valid.length : null;
+  // 音の高さと 明るさ
+  const L=picks.map(cs=>{ const v=cs.filter(c=>c!==null); return v.length? v.reduce((a,c)=>a+lum(c),0)/v.length : null; });
+  const W=320,H=150,p=28, x=i=>p+i*(W-2*p)/6, y=l=>H-p-l*(H-2*p);
+  let svg=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="音の高さと 選んだ色の 明るさ"><line x1="${p}" y1="${H-p}" x2="${W-p+6}" y2="${H-p}" stroke="var(--line)"/><line x1="${p}" y1="${p-6}" x2="${p}" y2="${H-p}" stroke="var(--line)"/>`;
+  const pts=L.map((l,i)=>l===null?null:[x(i),y(l)]).filter(v=>v);
+  if(pts.length>1) svg+=`<polyline fill="none" stroke="var(--sub)" stroke-width="2" points="${pts.map(q=>q.join(",")).join(" ")}"/>`;
+  L.forEach((l,i)=>{ if(l!==null){ const v=Math.round(l*255); svg+=`<circle cx="${x(i)}" cy="${y(l)}" r="8" fill="rgb(${v},${v},${v})" stroke="var(--ink)"/>`; }
+    svg+=`<text x="${x(i)}" y="${H-8}" font-size="12" text-anchor="middle" fill="currentColor">${NOTES[i].n}</text>`; });
+  svg+=`<text x="${p-6}" y="${p}" font-size="11" text-anchor="end" fill="currentColor">明</text><text x="${p-6}" y="${H-p}" font-size="11" text-anchor="end" fill="currentColor">暗</text></svg>`;
+  app.innerHTML=`
+  <div class="progress"><span style="width:100%"></span></div>
+  <h1>結果</h1>
+  <div class="panel"><h2>1. 毎回 同じ色だったか（一貫性）</h2>
+    ${NOTES.map((nt,i)=>`<div class="row"><span class="nm">${nt.n}</span>${picks[i].map(c=>`<span class="sw ${c===null?"na":""}" style="${c?`background:${css(c)}`:""}"></span>`).join("")}<span class="sc">${sc[i]===null?"—":sc[i].toFixed(2)}</span></div>`).join("")}
+    <p style="margin-top:10px">ばらつきの 平均：</p><p class="score">${mean===null?"—":mean.toFixed(2)}</p>
+    <p class="hint">小さいほど 毎回 同じ色。本物のテスト（The Synesthesia Battery）では 点数が 1 未満だと 共感覚の 可能性が あるとされる。ただし この簡易版の 色や 音は 本物とは 違うので 目安に すぎない（「色を 感じない」を 選んだ音は 計算しない）</p>
+  </div>
+  <div class="panel"><h2>2. 高い音ほど 明るい色を 選んだか</h2>
+    ${svg}
+    <p class="hint">丸＝その音に 選んだ色の 明るさの 平均。音が 高いほど 明るい色を 選ぶ 傾向は 共感覚の ない人にも 見られる（誰にでも ある 感覚の 対応）</p></div>
+  <div class="panel"><h2>知っておいてほしいこと</h2>
+    <p>共感覚の人は 何か月 あけても ほとんど 同じ色を 選ぶ。この簡易版では 診断は できません。</p>
+    <p class="small">じつは 同じ音が 3回ずつ ランダムな順で 出ていました。このアプリは 共感覚の 一貫性テスト（The Synesthesia Battery Eagleman ら 2007）の 考え方に ならった 簡易版です。本物の テスト：https://synesthete.org（英語 登録が必要）</p></div>
+  <button class="btn ghost" id="again">もう一度 やる</button>`;
+  document.getElementById("again").onclick=intro; window.scrollTo(0,0);
+}
+intro();
+</script>
+</body>
+</html>
