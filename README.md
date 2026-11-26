@@ -7,4 +7,4 @@
 - 公開URL：https://uec-aiba.github.io/sound-color/ （GitHub Pages）
 - 共感覚の一貫性テスト The Synesthesia Battery（Eagleman et al., 2007, J Neurosci Methods 159, 139–145; https://synesthete.org ）の考え方にならった簡易版です。色のパレット・音・点数の計算は本物とは異なり、診断はできません。
 - 音は Web Audio API でその場で合成しています（音声ファイルなし）。回答は端末の外に送られません（通信・保存なし）。
-- 作成：（先生のお名前）。コードの作成には AI（Claude）を使用しました。
+- 作成：饗庭絵里子　コードの作成には AI（Claude）を使用しました。
